@@ -59,7 +59,7 @@ zig build -Dtarget=x86_64-windows-gnu   # any target from any machine
 cd raycast && npm test              # the Raycast extensions' host
 ```
 
-`macos/package.sh` signs with `$CODESIGN_IDENTITY` and notarizes when notary credentials are set (see the script); otherwise it signs ad hoc. Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds, signs and attaches the release.
+`macos/package.sh` signs with `$CODESIGN_IDENTITY` and notarizes when notary credentials are set (see the script); otherwise it signs ad hoc. Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds, signs and attaches the release as a prerelease, then checks it end to end before it becomes the latest: `sh macos/verify-release.sh v0.2.7` checks a published release's files, its notarization and that it runs headless (safe on your Mac); `macos/verify-update.sh` launches it for real and updates the release before to it (CI only: it shows windows).
 
 ## How it's made
 
