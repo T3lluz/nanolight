@@ -8,7 +8,9 @@
 # each macOS, launches them, and updates the release before to this one; only
 # if all that passes does it become the latest. A release that fails stays a
 # prerelease, and nobody gets it: fix it and push a new tag, or rerun the
-# failed jobs if Apple or GitHub was the trouble.
+# failed jobs if Apple or GitHub was the trouble. If a pushed tag's run never
+# starts (GitHub has dropped the event), `gh workflow run release.yml --ref vX`
+# does the same.
 #
 # Signing and notarization use these repository secrets, the same names as
 # nanoterm's and Harness's. With all five, the app and image are signed with
@@ -147,4 +149,15 @@ jobs:
       - name: The latest release, for everyone
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest
+        # GitHub answers 502 now and then, and may apply half of the edit: asks
+        # again until "latest" really is this release, which everyone follows.
+        run: |
+          for try in 1 2 3 4 5; do
+            if gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest &&
+              [ "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" -q .tag_name)" = "$GITHUB_REF_NAME" ]; then
+              exit 0
+            fi
+            echo "$GITHUB_REF_NAME isn't the latest yet (try $try); retrying" >&2
+            sleep $((try * ${RETRY_S:-20}))
+          done
+          exit 1
