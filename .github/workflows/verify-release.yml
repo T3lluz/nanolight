@@ -12,6 +12,9 @@ on:
       tag:
         type: string
         required: true
+      from:
+        type: string
+        required: false
   workflow_dispatch:
     inputs:
       tag:
