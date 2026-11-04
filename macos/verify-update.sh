@@ -12,6 +12,9 @@
 # started with `open` gets the environment `open --env` gives it, so the new
 # copy, restarted by the updater, reads the real feed: TO must be the newest
 # release, or it would update again. SHOTS is where its screenshots go.
+#
+# Its hotkey is ⌃⌥⌘N, a key of its own: on a clean Mac Spotlight answers ⌘Space
+# too, and takes the keys typed after it.
 set -eu
 [ "${CI:-}" = true ] || {
     echo "verify-update.sh presses keys and replaces the installed app: CI runners only" >&2
@@ -30,6 +33,7 @@ cache="$HOME/Library/Caches/Nanolight"
 domain=dev.nanoui.nanolight
 team=WWP9DLJ27P
 port=8765
+chord=key:45:6400:110
 shots=${SHOTS:-/tmp/nanolight-shots}
 mkdir -p "$shots"
 
@@ -42,6 +46,10 @@ cd /
 die() {
     {
         echo "FAIL  $*"
+        if [ -s "$work/app.log" ]; then
+            echo "--- the app's log"
+            tail -20 "$work/app.log"
+        fi
         crashes=$(ls -t "$HOME"/Library/Logs/DiagnosticReports/*anolight* 2>/dev/null | head -1 || true)
         if [ -n "$crashes" ]; then
             echo "--- $crashes"
@@ -77,6 +85,7 @@ install() { # tag, as a person drags it to Applications, on a clean Mac
     stop
     rm -rf "$app" "$cache"
     defaults delete "$domain" 2>/dev/null || true
+    defaults write "$domain" nanolight.hotkey -string "$chord"
     t=$(mktemp -d "$work/unpack.XXXXXX")
     ditto -x -k "$(zip_of "$1")" "$t"
     ditto "$t/Nanolight.app" "$app"
@@ -88,7 +97,7 @@ install() { # tag, as a person drags it to Applications, on a clean Mac
 returning() { defaults write "$domain" nanolight.onboarded -string 1; }
 
 launch() { # the feed it reads
-    open --env "NANOUI_UPDATE_FEED=$1" "$app"
+    open --stderr "$work/app.log" --env "NANOUI_UPDATE_FEED=$1" "$app"
     n=0
     while [ -z "$(running)" ]; do
         n=$((n + 1))
@@ -135,9 +144,10 @@ see_panels() { # how many, what that means
 }
 
 keys() { osascript -e "tell application \"System Events\" to $1" >/dev/null || die "couldn't press keys: $1"; }
-hotkey() { keys 'key code 49 using command down'; }
+hotkey() { keys 'key code 45 using {control down, option down, command down}'; }
 ret() { keys 'key code 36'; }
 frontmost() { osascript -e 'tell application "System Events" to name of first process whose frontmost is true'; }
+pane_title() { osascript -e 'tell application "System Events" to name of window 1 of process "System Settings"' 2>/dev/null || true; }
 
 opened() { # the app a search's Return should have opened
     n=0
@@ -163,6 +173,27 @@ shot first-launch
 trusted
 ok "$to launches from a clean install and stays up"
 
+# The welcome's steps, as a new person goes through them.
+ret
+sleep 1.5
+shot welcome-try-it
+hotkey
+see_panels 0 "the welcome's hotkey step: it closes"
+hotkey
+see_panels 1 "the welcome's hotkey step: it opens again"
+sleep 2
+shot welcome-done
+ret
+n=0
+until [ "$(defaults read "$domain" nanolight.onboarded 2>/dev/null || true)" = 1 ]; do
+    n=$((n + 1))
+    [ "$n" -le 40 ] || die "Return didn't finish the welcome"
+    sleep 0.25
+done
+sleep 1
+shot welcome-finished
+ok "the welcome finishes"
+
 # ----- used as a person uses it -----
 
 echo "== $to, used"
@@ -178,6 +209,8 @@ sleep 0.5
 keys 'keystroke "calculator"'
 sleep 1
 shot used-search
+sleep 3
+shot used-search-later
 ret
 opened Calculator
 see_panels 0 "the panel goes as the app opens"
@@ -190,9 +223,14 @@ sleep 1
 shot used-pane-search
 ret
 opened "System Settings"
-sleep 4
+n=0
+until case "$(pane_title)" in *Login*) true ;; *) false ;; esac do
+    n=$((n + 1))
+    [ "$n" -le 40 ] || die "System Settings opened at \"$(pane_title)\", not Login Items"
+    sleep 0.5
+done
 shot used-pane
-echo "      System Settings is at: $(osascript -e 'tell application "System Settings" to id of current pane' 2>&1 || true)"
+ok "System Settings opened at \"$(pane_title)\""
 pkill -x "System Settings" || true
 [ "$(running)" = "$pid" ] || die "$to died while being used"
 ok "$to is still up"
@@ -322,8 +360,9 @@ settled() { # what must be true of an update that's done
     ok "the update is notarized, unquarantined, and left nothing behind"
 }
 
-# The update nearly everyone gets: the panel put away. Out of sight 10 s after
-# it's fetched (20 s after launch), so it restarts then, and nobody sees it.
+# The update nearly everyone gets: the panel put away, another app in front.
+# Out of sight 10 s after it's fetched (20 s after launch), it restarts then,
+# and nobody sees it.
 echo "== $from updates itself to $to, panel put away"
 install "$from"
 returning
@@ -331,7 +370,20 @@ old=$(launch "$releases/$to")
 see_panels 1 "launching shows the panel"
 hotkey
 see_panels 0 "the hotkey hides it"
-swapped "$old" 120
+echo "      with the panel hidden, in front: $(frontmost)"
+# With nothing else taking the front yet: does it go by itself?
+n=0
+while [ "$n" -lt 25 ] && [ "$(installed 2>/dev/null || true)" != "$to_version" ]; do
+    n=$((n + 1))
+    sleep 2
+done
+if [ "$(installed 2>/dev/null || true)" != "$to_version" ]; then
+    echo "      not updated after 50 s with the panel hidden; now another app comes in front"
+    osascript -e 'tell application "Finder" to activate' >/dev/null
+    sleep 1
+    echo "      in front: $(frontmost)"
+fi
+swapped "$old" 90
 settled
 see_panels 0 "it came back out of sight"
 front=$(frontmost)
