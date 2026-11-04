@@ -319,7 +319,7 @@ pub const Settings = struct {
             s.took_return = true;
             s.activateSelected(n);
         }
-        const h = n.follow(c, height);
+        const h = n.follow(height);
         const box = ui.div(c).column().wFull().h(h).clip();
         defer box.end();
         s.view(c, n, p);

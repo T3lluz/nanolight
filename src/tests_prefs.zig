@@ -7,6 +7,7 @@ const Index = @import("apps.zig").Index;
 const view = @import("view.zig");
 const settings_view = @import("settings_view.zig");
 const tests = @import("tests.zig");
+const suggest = @import("suggest.zig");
 const mac = @import("builtin").os.tag == .macos;
 const placeholder = "Search apps, do math, ask Grok…";
 
@@ -141,4 +142,53 @@ test "System Settings' panes open from the panel, which stays in its window (#12
     t.settle(1);
     try std.testing.expect(t.hasText("System Settings"));
     try std.testing.expect(s.height() <= view.max_height);
+}
+
+test "the panel's height lands at once, and keeps Google's room between keys" {
+    const gpa = std.testing.allocator;
+    var ix: Index = .init(gpa);
+    defer ix.deinit();
+    var web: tests.Web = .{};
+    var s: view.Nanolight = .{ .index = &ix };
+    defer s.query.deinit();
+    s.host = web.host();
+    s.host.?.resize = struct {
+        fn f(_: *anyopaque, _: f32) void {}
+    }.f;
+    s.reveal();
+    var t: ui.Tester = undefined;
+    try t.init(gpa, .init(&s, view.Nanolight.view), .{ .width = view.width, .height = view.max_height });
+    defer t.deinit();
+    t.frame();
+    t.textOps(&.{.{ .insert = "liq" }});
+    t.frame();
+    const bare = s.last_h;
+    // Google's rows: taller, in the one frame that lists them.
+    var said: suggest.List = .{};
+    for ([_][]const u8{ "liquid", "liquid glass" }) |w| said.push(w);
+    s.answered("liq", &said);
+    t.frame();
+    const full = s.last_h;
+    try std.testing.expect(full > bare);
+    // A key none of them begins with clears them, and the panel keeps
+    // their room.
+    t.textOps(&.{.{ .insert = "x" }});
+    t.frame();
+    try std.testing.expectEqual(@as(usize, 0), s.web.n);
+    try std.testing.expectEqual(full, s.last_h);
+    // An answer to older words is no answer to these.
+    s.unanswered("liq");
+    t.frame();
+    try std.testing.expectEqual(full, s.last_h);
+    // No answer is coming: the room goes, at once.
+    s.unanswered("liqx");
+    t.frame();
+    try std.testing.expectEqual(bare, s.last_h);
+    // Nothing is asked about an empty field, so nothing is kept for it.
+    s.answered("liqx", &said);
+    t.frame();
+    t.textOps(&.{ .{ .command = .select_all }, .{ .command = .delete_backward } });
+    t.frame();
+    try std.testing.expectEqual(s.height(), s.last_h);
+    try std.testing.expectEqual(@as(f32, 0), s.held_h);
 }
