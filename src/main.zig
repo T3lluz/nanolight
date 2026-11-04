@@ -35,6 +35,8 @@ const suggest_key = "nanolight.suggest";
 const searches_out_key = "nanolight.searches_out";
 /// "0": no menu bar icon (issue #8).
 const menu_bar_key = "nanolight.menu_bar";
+/// The panel's tint: a `palette.Theme`'s name ("system" when unset).
+const theme_key = "nanolight.theme";
 
 pub fn applyChoice(ctx: *anyopaque, choice: shortcut.Choice) void {
     Live.apply(ctx, choice);
@@ -256,6 +258,12 @@ pub const Live = struct {
     pub fn setSearchesOut(l: *Live, on: bool) void {
         l.s.searches_out = on;
         l.kv.set(searches_out_key, if (on) "1" else "0") catch {};
+    }
+
+    pub fn setTheme(l: *Live, theme: view.Theme) void {
+        l.s.theme = theme;
+        l.kv.set(theme_key, @tagName(theme)) catch {};
+        if (l.window) |w| w.redraw();
     }
 
     /// Whether the menu bar icon shows; `set` shows or hides it. Hidden,
@@ -529,6 +537,10 @@ pub fn main(init: std.process.Init) !void {
     if (kv.get(init.gpa, searches_out_key) catch null) |v| {
         defer init.gpa.free(v);
         s.searches_out = std.mem.eql(u8, v, "1");
+    }
+    if (kv.get(init.gpa, theme_key) catch null) |v| {
+        defer init.gpa.free(v);
+        s.theme = std.meta.stringToEnum(view.Theme, v) orelse .system;
     }
     s.reveal();
     // The rows first, so a snapshot is as tall as the panel.

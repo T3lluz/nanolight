@@ -12,6 +12,7 @@ pub var box: SettingsHost = .{
     .login = @import("main.zig").loginItem,
     .suggest = suggest,
     .searches_out = searchesOut,
+    .theme = theme,
     .menu_bar = menuBar,
     .account = acct,
     .email = email,
@@ -44,6 +45,10 @@ fn suggest(ctx: *anyopaque, on: bool) void {
 
 fn searchesOut(ctx: *anyopaque, on: bool) void {
     l(ctx).setSearchesOut(on);
+}
+
+fn theme(ctx: *anyopaque, t: @import("palette.zig").Theme) void {
+    l(ctx).setTheme(t);
 }
 
 fn menuBar(ctx: *anyopaque, set: ?bool) bool {

@@ -107,6 +107,40 @@ test "Settings hides the menu bar icon and sends searches out (issues #8, #10)" 
     try std.testing.expect(settings_view.height <= view.max_height);
 }
 
+test "Settings' header picks the panel's theme, and keeps it" {
+    const gpa = std.testing.allocator;
+    var ix: Index = .init(gpa);
+    defer ix.deinit();
+    var prefs: tests.Prefs = .{};
+    prefs.init();
+    var s: view.Nanolight = .{ .index = &ix };
+    defer s.query.deinit();
+    s.host = prefs.host();
+    s.openSettings();
+    var t: ui.Tester = undefined;
+    try t.init(gpa, .init(&s, view.Nanolight.view), .{ .width = view.width, .height = view.max_height, .dark = true });
+    defer t.deinit();
+    t.settle(1);
+    try std.testing.expect(t.findText("System") != null);
+    // ↑ from the first row: round to the header's swatches; → twice.
+    _ = t.shortcut(.{ .key = ui.Shortcut.up });
+    _ = t.shortcut(.{ .key = ui.Shortcut.right });
+    _ = t.shortcut(.{ .key = ui.Shortcut.right });
+    t.settle(1);
+    try std.testing.expectEqual(view.Theme.forest, s.theme);
+    try std.testing.expectEqual(view.Theme.forest, prefs.theme.?);
+    try std.testing.expect(t.findText("Forest") != null);
+    // ← past the first: round to the last.
+    _ = t.shortcut(.{ .key = ui.Shortcut.left });
+    _ = t.shortcut(.{ .key = ui.Shortcut.left });
+    _ = t.shortcut(.{ .key = ui.Shortcut.left });
+    t.settle(1);
+    try std.testing.expectEqual(view.Theme.violet, prefs.theme.?);
+    // In the header, which the rows can't push out of sight.
+    const name = t.findText("Violet").?;
+    try std.testing.expect(name.y + name.h <= view.header_h);
+}
+
 test "System Settings' panes open from the panel, which stays in its window (#12)" {
     if (!mac) return error.SkipZigTest;
     const gpa = std.testing.allocator;
