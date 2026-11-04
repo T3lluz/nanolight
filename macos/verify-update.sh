@@ -16,6 +16,7 @@
 # Its hotkey is ⌃⌥⌘N, a key of its own: on a clean Mac Spotlight answers ⌘Space
 # too, and takes the keys typed after it.
 set -eu
+here=$(cd "$(dirname "$0")" && pwd -P)
 [ "${CI:-}" = true ] || {
     echo "verify-update.sh presses keys and replaces the installed app: CI runners only" >&2
     exit 2
@@ -206,6 +207,7 @@ see_panels 0 "the hotkey hides it"
 hotkey
 see_panels 1 "the hotkey shows it"
 sleep 0.5
+SHOTS="$shots" EXPECT="${TYPING_EXPECT:-clean}" sh "$here/verify-typing.sh" || die "typing (#24)"
 keys 'keystroke "calculator"'
 sleep 1
 shot used-search

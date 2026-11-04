@@ -68,6 +68,9 @@ jobs:
       - name: First launch, update, refusals
         env:
           SHOTS: ${{ runner.temp }}/shots
+          # A pull request changes the checks, not the published build they
+          # run on: there the typing check reports, and a release must pass it.
+          TYPING_EXPECT: ${{ github.event_name == 'pull_request' && 'any' || 'clean' }}
         run: sh macos/verify-update.sh "${{ steps.which.outputs.from }}" "${{ steps.which.outputs.to }}"
 
       - uses: actions/upload-artifact@v4
