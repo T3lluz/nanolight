@@ -7,8 +7,10 @@
 #   sh macos/verify-typing.sh [cycles]
 #
 # Needs /Applications/Nanolight.app, running with its panel in front. Presses
-# keys, so CI only. A cycle where the word's pixels never changed fails in any
-# mode: the keys went elsewhere, and "never went back" would mean nothing.
+# keys, so CI only. If most cycles see the word's pixels never change, it fails
+# in any mode: the keys went elsewhere, and "never went back" would mean
+# nothing. An odd such cycle doesn't: builds with the bug have them (5 of 60 on
+# v0.2.7, none of 24 on the fix).
 # EXPECT=rollback inverts the verdict (a known-bad build must fail); EXPECT=any
 # only reports (a pull request can't change the published build it runs on).
 # SHOTS keeps what it saw of a rollback.
@@ -84,7 +86,7 @@ while [ "$i" -lt "$cycles" ]; do
     rm -rf "$dir"
 done
 echo "      $frames captures, about $((frames / cycles)) per 2 s; $back of $cycles went back; $blind saw no change"
-[ "$blind" = 0 ] || {
+[ $((blind * 2)) -lt "$cycles" ] || {
     echo "FAIL  the word's pixels never changed in $blind of $cycles cycles: this check saw nothing"
     exit 1
 }
