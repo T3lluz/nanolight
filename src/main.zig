@@ -530,6 +530,7 @@ pub fn main(init: std.process.Init) !void {
         defer init.gpa.free(v);
         s.searches_out = std.mem.eql(u8, v, "1");
     }
+    s.theme = @import("settings_bind.zig").loadTheme(kv, init.gpa);
     s.reveal();
     // The rows first, so a snapshot is as tall as the panel.
     s.rebuild();

@@ -4,6 +4,7 @@
 //! draw Settings with defaults and call nothing.
 const shortcut = @import("shortcut.zig");
 const account = @import("account.zig");
+const Theme = @import("palette.zig").Theme;
 
 pub const SettingsHost = struct {
     ctx: *anyopaque,
@@ -18,6 +19,8 @@ pub const SettingsHost = struct {
     suggest: *const fn (ctx: *anyopaque, on: bool) void,
     /// Return sends Google searches to the browser (on) or the panel.
     searches_out: *const fn (ctx: *anyopaque, on: bool) void,
+    /// The panel's tint, chosen in Settings: kept for the next launch.
+    theme: *const fn (ctx: *anyopaque, t: Theme) void,
     /// Whether the menu bar icon shows; `set` changes it first.
     menu_bar: *const fn (ctx: *anyopaque, set: ?bool) bool,
     account: *const fn (ctx: *anyopaque) account.State,
