@@ -1,7 +1,8 @@
 //! The panel's look on Linux, read once, the first time it is asked for.
 //!
 //! `$XDG_CONFIG_HOME/nanolight/theme.json` (or `~/.config/...`), if there,
-//! sets the colors, the corner radius and the font. Anything can write it;
+//! sets the colors (while the theme in Settings is System), the corner
+//! radius and the font. Anything can write it;
 //! Omarchy's sync writes its theme, Hyprland's rounding and its font. A
 //! change shows the next time Nanolight starts. Without the file the panel
 //! is dark when the desktop says so: nanoui only looks at `$GTK_THEME`,
@@ -109,7 +110,7 @@ fn parse(data: []const u8, font_out: []u8) ?Look {
     const muted = rgb(f.muted) orelse fg.alpha(0.7);
     const accent = rgb(f.accent) orelse ui.Color.hex(0x0a84ff);
     const sel = rgb(f.selection) orelse if (f.dark) ui.Color.white.alpha(0.16) else ui.Color.black.alpha(0.08);
-    const base = @import("palette.zig").builtIn(f.dark);
+    const base = @import("palette.zig").grey(f.dark);
     var t: ui.Theme = if (f.dark) .dark_theme else .light;
     t.background = bg;
     t.surface = sel;

@@ -4,6 +4,7 @@ const nanoui = @import("nanoui");
 const shortcut = @import("shortcut.zig");
 const account = @import("account.zig");
 const SettingsHost = @import("settings_host.zig").SettingsHost;
+const Theme = @import("palette.zig").Theme;
 pub var box: SettingsHost = .{
     .ctx = undefined,
     .choice = choice,
@@ -12,6 +13,7 @@ pub var box: SettingsHost = .{
     .login = @import("main.zig").loginItem,
     .suggest = suggest,
     .searches_out = searchesOut,
+    .theme = theme,
     .menu_bar = menuBar,
     .account = acct,
     .email = email,
@@ -44,6 +46,23 @@ fn suggest(ctx: *anyopaque, on: bool) void {
 
 fn searchesOut(ctx: *anyopaque, on: bool) void {
     l(ctx).setSearchesOut(on);
+}
+
+/// The panel's tint: a `Theme`'s name ("system" when unset).
+const theme_key = "nanolight.theme";
+
+fn theme(ctx: *anyopaque, t: Theme) void {
+    const live = l(ctx);
+    live.s.theme = t;
+    live.kv.set(theme_key, @tagName(t)) catch {};
+    if (live.window) |w| w.redraw();
+}
+
+/// The theme kept on this Mac, at launch.
+pub fn loadTheme(kv: nanoui.kv.Store, gpa: @import("std").mem.Allocator) Theme {
+    const v = kv.get(gpa, theme_key) catch null orelse return .system;
+    defer gpa.free(v);
+    return @import("std").meta.stringToEnum(Theme, v) orelse .system;
 }
 
 fn menuBar(ctx: *anyopaque, set: ?bool) bool {

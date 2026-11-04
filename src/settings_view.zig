@@ -16,7 +16,8 @@ const Choice = shortcut.Choice;
 const Palette = panel.Palette;
 const mac = @import("builtin").os.tag == .macos;
 
-const RowKind = enum { choice, suggest, files, browser, login, menu_bar, sync, terms, updates, welcome, quit };
+const RowKind = enum { choice, suggest, files, browser, login, menu_bar, sync, terms, updates, welcome, quit, theme };
+const Theme = @import("palette.zig").Theme;
 
 /// As tall as its sections, never past the window. Tighter Mac spacing
 /// fits file search, where searches open, and the menu bar icon.
@@ -85,18 +86,44 @@ pub const Settings = struct {
         const f = motion.frame(c, .{ .initial = .{ .opacity = 0, .x = 14 }, .transition = .{ .spring = panel.spring } });
         const page = ui.div(c).column().wFull().grow().motion(f);
         defer page.end();
-        head(c, p);
+        s.head(c, n, p, rows);
         s.body(c, n, p, rows);
         foot(c, p);
     }
 
-    fn head(c: *ui.Context, p: Palette) void {
+    fn head(s: *Settings, c: *ui.Context, n: *panel.Nanolight, p: Palette, rows: []const RowKind) void {
         const bar = ui.div(c).row().wFull().h(panel.header_h).px(16).gap(10).itemsCenter();
         defer bar.end();
         const badge = ui.div(c).size(28, 28).rounded(8).center().bg(p.tile);
         ui.icon(c, "gearshape", .{ .size = 15, .weight = .medium, .color = p.text });
         badge.end();
         ui.text(c, "Settings", .{ .size = 18, .weight = .semibold, .color = p.text, .tracking = -0.2 });
+        ui.spacer(c);
+        s.themes(c, n, p, rows);
+    }
+
+    /// The theme's swatches, in the header: always in sight, however many
+    /// rows are under it. The last row for ↑/↓; ←/→ step through them.
+    fn themes(s: *Settings, c: *ui.Context, n: *panel.Nanolight, p: Palette, rows: []const RowKind) void {
+        const on = isSel(rows, s.sel, .theme);
+        ui.key(c, "theme");
+        const group = ui.div(c).row().h(30).px(10).gap(4).itemsCenter().rounded(10).bg(if (on) p.sel else p.fill.alpha(0));
+        defer group.end();
+        ui.text(c, n.theme.title(), .{ .size = 12.5, .weight = .medium, .color = if (on) p.text else p.sub });
+        ui.div(c).w(4).end();
+        for (Theme.all) |t| {
+            ui.key(c, c.print("theme-{s}", .{@tagName(t)}));
+            const ring = ui.div(c).size(20, 20).roundedFull().center().control().border(if (t == n.theme) p.text.alpha(0.7) else p.fill.alpha(0));
+            defer ring.end();
+            if (ring.clicked()) s.setTheme(n, t);
+            ui.div(c).size(12, 12).roundedFull().bg(t.hue(c.theme.dark) orelse p.sub).end();
+        }
+    }
+
+    fn setTheme(s: *Settings, n: *panel.Nanolight, t: Theme) void {
+        n.theme = t;
+        const h = s.hooks(n) orelse return;
+        h.theme(h.ctx, t);
     }
 
     fn body(s: *Settings, c: *ui.Context, n: *panel.Nanolight, p: Palette, rows: []const RowKind) void {
@@ -341,8 +368,11 @@ pub const Settings = struct {
     }
 
     fn nudge(s: *Settings, n: *panel.Nanolight, rows: []const RowKind, dir: i8) void {
-        if (rows[s.sel] != .choice) return;
-        s.pick(n, s.choice.step(dir));
+        switch (rows[s.sel]) {
+            .choice => s.pick(n, s.choice.step(dir)),
+            .theme => s.setTheme(n, n.theme.step(dir)),
+            else => {},
+        }
     }
 
     fn activate(s: *Settings, n: *panel.Nanolight, kind: RowKind) void {
@@ -365,14 +395,15 @@ pub const Settings = struct {
                 host.welcome(host.ctx);
             },
             .quit => if (h) |host| host.quit(host.ctx),
+            .theme => s.setTheme(n, n.theme.step(1)),
         }
     }
 };
 
 fn rowList(state: account.State) []const RowKind {
     return switch (state) {
-        .signed_out, .starting => if (mac) &.{ .choice, .suggest, .files, .browser, .login, .menu_bar, .sync, .terms, .updates, .welcome, .quit } else &.{ .choice, .suggest, .login, .sync, .terms, .updates, .welcome, .quit },
-        .waiting, .signed_in => if (mac) &.{ .choice, .suggest, .files, .browser, .login, .menu_bar, .sync, .updates, .welcome, .quit } else &.{ .choice, .suggest, .login, .sync, .updates, .welcome, .quit },
+        .signed_out, .starting => if (mac) &.{ .choice, .suggest, .files, .browser, .login, .menu_bar, .sync, .terms, .updates, .welcome, .quit, .theme } else &.{ .choice, .suggest, .login, .sync, .terms, .updates, .welcome, .quit, .theme },
+        .waiting, .signed_in => if (mac) &.{ .choice, .suggest, .files, .browser, .login, .menu_bar, .sync, .updates, .welcome, .quit, .theme } else &.{ .choice, .suggest, .login, .sync, .updates, .welcome, .quit, .theme },
     };
 }
 

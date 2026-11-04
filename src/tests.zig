@@ -13,6 +13,7 @@ test {
     _ = @import("suggest.zig");
     _ = @import("promo_camera.zig");
     _ = @import("settings.zig");
+    _ = @import("palette.zig");
     _ = @import("apps.zig");
     _ = @import("shortcut.zig");
     _ = @import("settings_panes.zig");
@@ -360,6 +361,7 @@ pub const Prefs = struct {
     login_on: bool = false,
     suggest_sets: u8 = 0,
     searches_out: ?bool = null,
+    theme: ?@import("palette.zig").Theme = null,
     menu_bar_on: bool = true,
     box: SettingsHost = undefined,
 
@@ -372,6 +374,7 @@ pub const Prefs = struct {
             .login = login,
             .suggest = suggestSet,
             .searches_out = searchesOut,
+            .theme = themeSet,
             .menu_bar = menuBar,
             .account = acct,
             .email = email,
@@ -416,6 +419,9 @@ pub const Prefs = struct {
     }
     fn searchesOut(ctx: *anyopaque, on: bool) void {
         @as(*Prefs, @ptrCast(@alignCast(ctx))).searches_out = on;
+    }
+    fn themeSet(ctx: *anyopaque, t: @import("palette.zig").Theme) void {
+        @as(*Prefs, @ptrCast(@alignCast(ctx))).theme = t;
     }
     fn menuBar(ctx: *anyopaque, set: ?bool) bool {
         const p: *Prefs = @ptrCast(@alignCast(ctx));
