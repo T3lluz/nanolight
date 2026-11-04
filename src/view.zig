@@ -162,7 +162,7 @@ pub const Nanolight = struct {
 
     pub fn panel(s: *Nanolight, c: *ui.Context) void {
         const p = palette(c.theme.dark);
-        const shell = ui.div(c).column().w(width).rounded(18).border(p.hair).clip();
+        const shell = ui.div(c).column().w(width).rounded(@import("linux_theme.zig").radius()).border(p.hair).clip();
         if (s.own_glass) {
             _ = shell.glass(.{ .tint = if (c.theme.dark) ui.Color.black.alpha(0.42) else ui.Color.white.alpha(0.5) })
                 .shadows(&.{ .{ .color = .{ .a = 0.22 }, .blur = 4, .y = 1 }, .{ .color = .{ .a = 0.28 }, .blur = 40, .y = 18 } });

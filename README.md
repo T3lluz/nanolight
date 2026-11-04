@@ -42,6 +42,7 @@ From the [latest release](https://github.com/justrach/nanolight/releases/latest)
 - **Mac**: `nanolight-macos-arm64.dmg`. Open it and drag Nanolight to Applications. macOS 14 or later, Apple silicon.
 - **Windows**: `nanolight-windows-x86_64.zip`. Unzip it anywhere you can write and run `nanolight.exe`. Windows 10 or later.
 - **Linux**: `nanolight-linux-x86_64.tar.gz` (or `aarch64`). Unpack it and run `nanolight`. It needs GTK 3 (or 4) and an X11 session for its key; on Wayland, bind `nanolight --toggle` to a key in your desktop's keyboard settings.
+  The panel is dark when gsettings or `$GTK_THEME` says the desktop is. A `~/.config/nanolight/theme.json` can set its colors, corner radius and font instead (`dark`, `background`, `foreground`, `muted`, `accent`, `selection` as `#rrggbb`, `rounding`, `font`); Nanolight reads it when it starts. [`src/linux_theme.zig`](src/linux_theme.zig) has an example.
 
 On first run a short welcome picks the key that opens it and says who else holds it. On the Mac that's ⌘Space, ⌥Space, ⌃Space or ⌥⌘Space (any other, such as ⌥X, can be recorded later in Settings; Spotlight gives up ⌘Space in System Settings → Keyboard → Keyboard Shortcuts → Spotlight); on a PC, Alt Space, Ctrl Alt Space, Ctrl Space or Ctrl Shift Space. Releases update themselves from this repository's releases, restarting into the new version while the panel is away.
 
@@ -73,6 +74,7 @@ cd raycast && npm test              # the Raycast extensions' host
 | `src/suggest.zig` | Google's completions: the privacy guard, decoding, the cache (after [browse](https://github.com/justrach/browse)) |
 | `src/preview.zig` | The results page in the panel (WKWebView, the Mac) |
 | `src/panel_mac.zig`, `src/panel_pc.zig` | The panel's window on the Mac, and on Windows and Linux |
+| `src/linux_theme.zig` | Linux: the panel's colors, corners and font from an optional `~/.config/nanolight/theme.json`, else dark when gsettings says so |
 | `src/hotkey*.zig`, `src/apps_*.zig`, `src/single*.zig`, `src/login.zig`, `src/keychain*.zig` | Each platform's key, apps, single copy, login item and secret |
 | `src/raycast*.zig`, `raycast/` | Raycast extensions: the panel's screen, the Node host and its `@raycast/api` |
 | `src/script_commands.zig`, `src/script_run.zig` | Raycast script commands, run in Zig |

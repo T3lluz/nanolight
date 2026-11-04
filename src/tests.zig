@@ -37,6 +37,7 @@ test {
         },
         else => {
             _ = @import("apps_linux.zig");
+            _ = @import("linux_theme.zig");
             _ = @import("hotkey_x11.zig");
         },
     }

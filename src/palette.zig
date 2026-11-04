@@ -6,7 +6,12 @@ pub const Palette = struct { text: ui.Color, sub: ui.Color, hair: ui.Color, sel:
 
 const pc = @import("builtin").os.tag != .macos;
 
+/// The built-in colors, or on Linux a theme.json's (linux_theme.zig).
 pub fn palette(dark: bool) Palette {
+    return @import("linux_theme.zig").palette() orelse builtIn(dark);
+}
+
+pub fn builtIn(dark: bool) Palette {
     return if (dark) .{
         .text = .hex(0xeeeeee),
         .sub = .hex(0xb5b5b5),

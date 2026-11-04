@@ -17,6 +17,8 @@ pub fn adjust(o: *nanoui.WindowOptions, _: bool, h: f32) void {
     o.skip_taskbar = true;
     o.always_on_top = true;
     o.transparent = true;
+    // Linux: a theme.json's colors and font, or dark on a dark desktop.
+    o.theme = @import("linux_theme.zig").windowTheme();
 }
 
 pub fn setup(_: *nanoui.App, w: *nanoui.Window, s: *view.Nanolight, _: f32) void {
