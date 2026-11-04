@@ -1,7 +1,7 @@
 //! The launcher panel: the query, then what it finds in sections, then a
 //! footer naming what Return does. Neutral glass, a hairline rim, 40-point
 //! rows, the selection a grey step that slides between them. Nothing moves
-//! while nothing happens: frames come from keys, and from height settling.
+//! while nothing happens: frames come from keys.
 const std = @import("std");
 const nanoui = @import("nanoui");
 const ui = nanoui.ui;
@@ -10,6 +10,7 @@ const Index = @import("apps.zig").Index;
 const results = @import("results.zig");
 const files = @import("files.zig");
 const files_view = @import("files_view.zig");
+const answers = @import("answers.zig");
 const suggest = @import("suggest.zig");
 const text = @import("text.zig");
 const settings_view = @import("settings_view.zig");
@@ -61,7 +62,7 @@ pub const max_height: f32 = header_h + footer_h + 2 + list_pad * 2 + results.max
 pub fn webArea(h: f32) struct { y: f32, h: f32 } {
     return .{ .y = header_h + 1, .h = @max(0, h - header_h - footer_h - 2) };
 }
-/// Opening and growing: snappy, a touch under critical damping.
+/// Opening: snappy, a touch under critical damping.
 pub const spring: motion.Spring = .{ .stiffness = 320, .damping = 32 };
 const slide: motion.Spring = .{ .stiffness = 700, .damping = 52 };
 
@@ -94,6 +95,8 @@ pub const Nanolight = struct {
     spans: [results.max_rows][16]ui.Span = undefined,
     url_buf: [1024]u8 = undefined,
     last_h: f32 = 0,
+    /// The height kept while Google is asked (answers.zig); 0 when it isn't.
+    held_h: f32 = 0,
     /// The query as it was shown: selected, so no completion after it yet.
     revealed: u64 = 0,
     /// Said in the footer in place of the name ("Updated to 0.1.3"), if set.
@@ -133,6 +136,10 @@ pub const Nanolight = struct {
         if (s.settings_ui.open) return settings_view.height;
         if (s.ext) |e| if (e.open) return e.height();
         if (s.previewing) return max_height;
+        return @max(s.rowsHeight(), s.held_h);
+    }
+
+    fn rowsHeight(s: *const Nanolight) f32 {
         var h: f32 = header_h + footer_h + 1;
         if (s.res.n == 0) return h;
         h += 1 + list_pad * 2;
@@ -170,7 +177,7 @@ pub const Nanolight = struct {
         }
         defer shell.end();
         if (s.onboard) |o| if (o.active) {
-            const h = s.follow(c, o.height());
+            const h = s.follow(o.height());
             const body = ui.div(c).column().wFull().h(h).clip();
             defer body.end();
             o.view(c, s, p);
@@ -186,7 +193,7 @@ pub const Nanolight = struct {
         // Typing takes the page away: the rows are for the new words.
         if (s.previewing and std.hash.Wyhash.hash(0, s.query.text()) != s.preview_q) s.back();
         if (submitted) s.activate(c);
-        const h = s.follow(c, s.height());
+        const h = s.follow(s.height());
         {
             const body = ui.div(c).column().wFull().h(h - header_h).clip();
             defer body.end();
@@ -205,9 +212,10 @@ pub const Nanolight = struct {
         }
     }
 
-    /// The panel's height, springing to `target`; a window follows it.
-    pub fn follow(s: *Nanolight, c: *ui.Context, target: f32) f32 {
-        const h = motion.number(c, "panel-h", @min(target, max_height), .{ .spring = spring });
+    /// The panel's height: `target`, at once, as the rows it fits are there
+    /// at once (easing to it only made each key wait); a window follows it.
+    pub fn follow(s: *Nanolight, target: f32) f32 {
+        const h = @min(target, max_height);
         if (s.host) |host| if (host.resize) |f| if (@abs(h - s.last_h) > 0.25) {
             s.last_h = h;
             f(host.ctx, h);
@@ -305,8 +313,13 @@ pub const Nanolight = struct {
         s.built = h;
         files_view.rebuild(s);
         s.web.n = 0;
+        const held = @max(s.held_h, s.rowsHeight());
+        s.held_h = 0;
         if (s.host) |host| if (host.suggest) |ask| if (s.suggest_on and suggest.eligible(q) and @import("calc.zig").eval(q) == null) {
-            if (!s.cache.lookup(q, &s.web)) ask(host.ctx, q);
+            if (!s.cache.lookup(q, &s.web)) {
+                s.held_h = held;
+                ask(host.ctx, q);
+            }
         };
         s.fill();
         // The first row: an app, the answer, or the search for what was
@@ -321,39 +334,8 @@ pub const Nanolight = struct {
         s.res.build(s.query.text(), s.index, sug[0..ns], s.web.slices(&web), &s.found);
     }
 
-    /// Google's completions of `typed` (what `Host.suggest` asked): kept,
-    /// and listed if it is still what is typed. The selection stays on the
-    /// row it was on, wherever that row now is: Return a moment after
-    /// typing does what the panel showed, not a completion that just came.
-    pub fn answered(s: *Nanolight, typed: []const u8, said: *const suggest.List) void {
-        s.cache.put(typed, said);
-        if (!suggest.same(typed, s.query.text())) return;
-        const was: ?Row = if (s.sel < s.res.n) s.res.rows[s.sel] else null;
-        var was_text: [suggest.max_len]u8 = undefined;
-        var was_len: usize = 0;
-        if (was) |r| if (r.kind == .suggest) {
-            const w = s.web.get(r.web);
-            @memcpy(was_text[0..w.len], w);
-            was_len = w.len;
-        };
-        s.web = said.*;
-        s.fill();
-        s.sel = 0;
-        const r = was orelse return;
-        for (s.res.slice(), 0..) |now, i| {
-            const same_row = now.kind == r.kind and switch (r.kind) {
-                .app, .pane => now.app == r.app,
-                .file => now.file == r.file,
-                .suggest => suggest.same(s.web.get(now.web), was_text[0..was_len]),
-                else => true,
-            };
-            if (same_row) {
-                s.sel = i;
-                return;
-            }
-        }
-    }
-
+    pub const answered = answers.answered;
+    pub const unanswered = answers.unanswered;
     pub const filesAnswered = files_view.filesAnswered;
 
     fn list(s: *Nanolight, c: *ui.Context, p: Palette) void {
